@@ -1,0 +1,37 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "C:\\Users\\Giorg\\source\\repos\\PythonApplication3\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{28DD1A25-C97C-4FD3-863B-42128C64CFAC}|PythonApplication3\\PythonApplication3.pyproj|C:\\Users\\Giorg\\source\\repos\\PythonApplication3\\PythonApplication3\\PythonApplication3.py||{8B382828-6202-11D1-8870-0000F87579D2}",
+      "RelativeMoniker": "D:0:0:{28DD1A25-C97C-4FD3-863B-42128C64CFAC}|PythonApplication3\\PythonApplication3.pyproj|solutionrelative:PythonApplication3\\PythonApplication3.py||{8B382828-6202-11D1-8870-0000F87579D2}"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 0,
+          "Children": [
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "PythonApplication3.py",
+              "DocumentMoniker": "C:\\Users\\Giorg\\source\\repos\\PythonApplication3\\PythonApplication3\\PythonApplication3.py",
+              "RelativeDocumentMoniker": "PythonApplication3\\PythonApplication3.py",
+              "ToolTip": "C:\\Users\\Giorg\\source\\repos\\PythonApplication3\\PythonApplication3\\PythonApplication3.py",
+              "RelativeToolTip": "PythonApplication3\\PythonApplication3.py",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001001|",
+              "WhenOpened": "2025-08-10T17:49:04.461Z",
+              "EditorCaption": ""
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
