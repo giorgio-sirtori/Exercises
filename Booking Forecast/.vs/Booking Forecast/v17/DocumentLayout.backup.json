@@ -3,6 +3,10 @@
   "WorkspaceRootPath": "C:\\Users\\Giorg\\source\\repos\\Booking Forecast\\",
   "Documents": [
     {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\Giorg\\source\\repos\\Booking Forecast\\Booking Forecast\\Booking_Forecast_v2.py||{8B382828-6202-11D1-8870-0000F87579D2}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:Booking Forecast\\Booking_Forecast_v2.py||{8B382828-6202-11D1-8870-0000F87579D2}"
+    },
+    {
       "AbsoluteMoniker": "D:0:0:{169DFFDD-97AF-4029-9333-93A1B4E81701}|Booking Forecast\\Booking Forecast.pyproj|C:\\Users\\Giorg\\source\\repos\\Booking Forecast\\Booking Forecast\\Booking_Forecast.py||{8B382828-6202-11D1-8870-0000F87579D2}",
       "RelativeMoniker": "D:0:0:{169DFFDD-97AF-4029-9333-93A1B4E81701}|Booking Forecast\\Booking Forecast.pyproj|solutionrelative:Booking Forecast\\Booking_Forecast.py||{8B382828-6202-11D1-8870-0000F87579D2}"
     }
@@ -19,12 +23,25 @@
             {
               "$type": "Document",
               "DocumentIndex": 0,
+              "Title": "Booking_Forecast_v2.py",
+              "DocumentMoniker": "C:\\Users\\Giorg\\source\\repos\\Booking Forecast\\Booking Forecast\\Booking_Forecast_v2.py",
+              "RelativeDocumentMoniker": "Booking Forecast\\Booking_Forecast_v2.py",
+              "ToolTip": "C:\\Users\\Giorg\\source\\repos\\Booking Forecast\\Booking Forecast\\Booking_Forecast_v2.py",
+              "RelativeToolTip": "Booking Forecast\\Booking_Forecast_v2.py",
+              "ViewState": "AgIAAN4BAAAAAAAAAAAqwPMBAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001001|",
+              "WhenOpened": "2025-08-17T17:41:09.759Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
               "Title": "Booking_Forecast.py",
               "DocumentMoniker": "C:\\Users\\Giorg\\source\\repos\\Booking Forecast\\Booking Forecast\\Booking_Forecast.py",
               "RelativeDocumentMoniker": "Booking Forecast\\Booking_Forecast.py",
               "ToolTip": "C:\\Users\\Giorg\\source\\repos\\Booking Forecast\\Booking Forecast\\Booking_Forecast.py",
               "RelativeToolTip": "Booking Forecast\\Booking_Forecast.py",
-              "ViewState": "AgIAAH0BAAAAAAAAAAAAwJkBAAAAAAAAAAAAAA==",
+              "ViewState": "AgIAALsBAAAAAAAAAAAiwMMBAAAuAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001001|",
               "WhenOpened": "2025-08-15T20:01:52.845Z",
               "EditorCaption": ""
