@@ -279,7 +279,7 @@ def main():
 
     with tab2:
         st.header(f"Parametric VaR Analysis ({confidence_level:.0%})")
-        st.markdown("This analysis uses the **variance-covariance method**, assuming returns follow a normal distribution, to calculate the portfolio's Value at Risk (VaR).")
+        #st.markdown("This analysis uses the **variance-covariance method**, assuming returns follow a normal distribution, to calculate the portfolio's Value at Risk (VaR).")
         col1, col2, col3 = st.columns(3)
         col1.metric("Total Portfolio VaR", f"€{portfolio_var:,.0f}", help="The maximum expected loss for the entire portfolio after accounting for diversification.")
         col2.metric("Undiversified VaR", f"€{sum_individual_var:,.0f}", help="The sum of the VaRs of each currency position, calculated independently.")

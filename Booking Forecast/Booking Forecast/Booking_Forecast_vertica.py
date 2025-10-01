@@ -1,7 +1,7 @@
 # ota_forecast_dashboard.py
-# Dash app: Upload OTA daily sales CSV and generate forecasts (Prophet, SARIMA, Holt-Winters, Naive-seasonal)
+# Dash app: Load OTA daily sales from Vertica DB and generate forecasts
 # Two independent blocks:
-#  - Block 1: Data Exploration (upload, inspect actuals, descriptive stats, filters)
+#  - Block 1: Data Exploration (load from DB, inspect actuals, descriptive stats, filters)
 #  - Block 2: Forecasting (choose model, horizon, run forecast on full or subset, per-category charts, export CSV)
 
 import base64
@@ -11,6 +11,7 @@ from typing import Optional, Tuple
 
 import numpy as np
 import pandas as pd
+import vertica_python # MODIFIED: Import vertica driver
 
 from dash import Dash, dcc, html, Input, Output, State, dash_table, no_update
 import dash_bootstrap_components as dbc
@@ -34,16 +35,62 @@ from statsmodels.tsa.statespace.sarimax import SARIMAX
 # Helpers
 # -------------------------------
 
-def parse_csv_contents(contents: str) -> pd.DataFrame:
-    if not contents:
-        return pd.DataFrame()
-    content_type, content_string = contents.split(',')
-    decoded = base64.b64decode(content_string)
+# NEW: Function to fetch data from Vertica
+def fetch_data_from_vertica() -> pd.DataFrame:
+    """
+    Connects to Vertica, executes a query, and returns a DataFrame.
+    """
+    # IMPORTANT: Replace with your actual connection details.
+    # For security, use environment variables or a secrets manager in production.
+    conn_info = {
+        'host': 'prd-vertica-live-lb.prd.bravofly.intra',
+        'port': 5433,
+        'user': 'fba_lab',
+        'password': 'mk@6fH!1Mt',
+        'database': 'Vertica',
+    }
+
+    # IMPORTANT: Replace with your actual SQL query.
+    # Ensure your query returns columns that can be mapped to the required names.
+    query = """
+    select 
+        BK_DATE ,
+        BK_CATEGORY ,
+        CNS_CHANNEL ,
+        dc.EPM_GEOGRAPHY ,
+        count(distinct dbg.BK_GLOBAL_ID) as BK_COUNT
+        from epm.DIM_BOOKING_GLOBAL dbg 
+        inner join dwhbfy.dim_country dc on dc.id_country = dbg.BP_COUNTRY 
+        where dbg.EPM_FLAG is true 
+        group by 1,2,3,4
+        order by 1,2,3,4;
+    """
+    
+    conn = None # Initialize conn to None
     try:
-        df = pd.read_csv(io.BytesIO(decoded))
+        print("Connecting to Vertica...")
+        conn = vertica_python.connect(**conn_info)
+        print("Connection successful. Fetching data...")
+        df = pd.read_sql_query(query, conn)
+        print(f"Successfully fetched {len(df)} rows.")
+        return df
     except Exception as e:
-        s = decoded.decode('utf-8', errors='replace')
-        df = pd.read_csv(io.StringIO(s))
+        print(f"Error fetching data from Vertica: {e}")
+        # Return an empty DataFrame on error to prevent app crash
+        return pd.DataFrame()
+    finally:
+        if conn:
+            conn.close()
+            print("Vertica connection closed.")
+
+
+def preprocess_data(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Takes the raw DataFrame from the DB and applies necessary preprocessing.
+    This function contains the logic from the old `parse_csv_contents`.
+    """
+    if df.empty:
+        return df
 
     # Normalize variety of possible column names
     rename_map = {
@@ -53,12 +100,12 @@ def parse_csv_contents(contents: str) -> pd.DataFrame:
         'bk_date': 'BK_DATE', 'date': 'BK_DATE',
         'count': 'COUNT', 'bookings': 'COUNT', 'qty': 'COUNT', 'BK_COUNT': 'COUNT'
     }
-    df.rename(columns={c: rename_map.get(c, c) for c in df.columns}, inplace=True)
+    df.rename(columns=lambda c: rename_map.get(c.lower(), c.upper()), inplace=True)
 
     required = {'BK_CATEGORY', 'CNS_CHANNEL', 'EPM_GEOGRAPHY', 'BK_DATE'}
     if not required.issubset(set(df.columns)):
         missing = required - set(df.columns)
-        raise ValueError(f"Missing required columns: {missing}")
+        raise ValueError(f"Missing required columns from DB query: {missing}")
 
     # assume count is 1 if missing
     if 'COUNT' not in df.columns:
@@ -184,9 +231,14 @@ app.layout = dbc.Container([
     dcc.Store(id='stored-data'),
     dcc.Store(id='stored-forecast-data'),
     html.H3('Data Exploration'),
-    dcc.Upload(id='upload-data', children=html.Div(['Drag & Drop or ', html.A('Select CSV')]),
-               style={'width': '100%', 'height': '60px', 'lineHeight': '60px', 'borderWidth': '1px', 'borderStyle': 'dashed', 'borderRadius': '5px', 'textAlign': 'center'}),
-    html.Div(id='upload-message', style={'marginTop': '8px'}),
+
+    # MODIFIED: Replaced dcc.Upload with a button
+    dbc.Row([
+        dbc.Col(dbc.Button('Load Data from Vertica', id='fetch-data-btn', color='info', className='w-100'), md=3),
+        dbc.Col(html.Div(id='db-message', style={'marginTop': '8px'}), md=9)
+    ]),
+    
+    html.Br(),
     dbc.Row([
         dbc.Col(dcc.Dropdown(id='explore-category', placeholder='Category (multi)', multi=True), md=4),
         dbc.Col(dcc.Dropdown(id='explore-channel', placeholder='Channel (multi)', multi=True), md=4),
@@ -219,7 +271,6 @@ app.layout = dbc.Container([
             {'label': 'Trailing 12 months', 'value': 'TTM'},
             {'label': 'Trailing 24 months', 'value': 'TTM24'}
         ], value='TTM24'), md=3),
-        # ADDED: Granularity dropdown
         dbc.Col(dcc.Dropdown(id='forecast-granularity', options=[
             {'label': 'Granularity: By Category', 'value': 'category'},
             {'label': 'Granularity: By Category & Channel', 'value': 'category_channel'},
@@ -252,9 +303,10 @@ def show_granularity_warning(granularity):
     return granularity == 'all'
 
 
+# MODIFIED: This callback now triggers from the button click instead of file upload.
 @app.callback(
     [Output('stored-data', 'data'),
-     Output('upload-message', 'children'),
+     Output('db-message', 'children'),
      Output('explore-category', 'options'),
      Output('explore-channel', 'options'),
      Output('explore-geo', 'options'),
@@ -266,24 +318,29 @@ def show_granularity_warning(granularity):
      Output('forecast-dates', 'start_date'),
      Output('forecast-dates', 'end_date'),
     ],
-    Input('upload-data', 'contents'),
-    State('upload-data', 'filename')
+    Input('fetch-data-btn', 'n_clicks'),
+    prevent_initial_call=True
 )
-def handle_upload(contents, filename):
-    if not contents:
-        return no_update
+def load_data_from_db(n_clicks):
     try:
-        df = parse_csv_contents(contents)
+        df_raw = fetch_data_from_vertica()
+        if df_raw.empty:
+            return no_update, "Failed to fetch data or query returned no rows.", [], [], [], None, None, [], [], [], None, None
+        
+        df = preprocess_data(df_raw)
+
     except Exception as e:
-        return None, html.Div(['Error parsing CSV: ', html.Code(str(e))]), [], [], [], None, None, [], [], [], None, None
+        error_msg = f"Error processing data: {e}"
+        return None, dbc.Alert(error_msg, color="danger"), [], [], [], None, None, [], [], [], None, None
 
     cats = [{'label': c, 'value': c} for c in sorted(df['BK_CATEGORY'].unique())]
     chs = [{'label': c, 'value': c} for c in sorted(df['CNS_CHANNEL'].unique())]
     geos = [{'label': c, 'value': c} for c in sorted(df['EPM_GEOGRAPHY'].unique())]
     min_date = df['BK_DATE'].min().date()
     max_date = df['BK_DATE'].max().date()
-
-    return (df.to_json(date_format='iso', orient='records'), f'Loaded: {filename}',
+    
+    success_msg = f"Successfully loaded and processed {len(df)} records."
+    return (df.to_json(date_format='iso', orient='records'), dbc.Alert(success_msg, color="success"),
             cats, chs, geos, min_date, max_date,
             cats, chs, geos, min_date, max_date)
 
@@ -302,7 +359,7 @@ def handle_upload(contents, filename):
 )
 def update_explore(json_data, cat, chan, geo, start_date, end_date):
     if not json_data:
-        return go.Figure(), '', [], []
+        return go.Figure(layout={'template':'plotly_dark'}), '', [], []
     df = pd.read_json(json_data, orient='records')
     df['BK_DATE'] = pd.to_datetime(df['BK_DATE'])
 
@@ -349,7 +406,7 @@ def update_explore(json_data, cat, chan, geo, start_date, end_date):
      State('model-select', 'value'),
      State('horizon', 'value'),
      State('training-window', 'value'),
-     State('forecast-granularity', 'value')], # MODIFIED: Get granularity value
+     State('forecast-granularity', 'value')],
     prevent_initial_call=True
 )
 def run_forecast_callback(n_clicks, json_data, cat, chan, geo, start_date, end_date, model, horizon, training_window, granularity):
@@ -389,7 +446,6 @@ def run_forecast_callback(n_clicks, json_data, cat, chan, geo, start_date, end_d
         cat_children = []
         rows = []
 
-        # MODIFIED: Determine grouping based on selected granularity
         if granularity == 'category':
             group_cols = ['BK_CATEGORY']
         elif granularity == 'category_channel':
@@ -440,7 +496,6 @@ def run_forecast_callback(n_clicks, json_data, cat, chan, geo, start_date, end_d
         out_df = pd.DataFrame()
         if rows:
             out_df = pd.concat(rows).reset_index(drop=True)
-            # Reorder columns for clarity
             cols_order = group_cols + [col for col in out_df.columns if col not in group_cols]
             out_df = out_df[cols_order]
 
