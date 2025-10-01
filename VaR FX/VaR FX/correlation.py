@@ -40,7 +40,8 @@ forex_pairs = {
     "SEK/EUR": "SEKEUR=X",
     "PLN/EUR": "PLNEUR=X",
     "AUD/EUR": "AUDEUR=X",
-    "CZK/EUR": "CZKEUR=X"
+    "CZK/EUR": "CZKEUR=X",
+    "USD/EUR": "USDEUR=X"
 }
 
 pair1_label = st.sidebar.selectbox("First Currency Pair:", list(forex_pairs.keys()), index=0)

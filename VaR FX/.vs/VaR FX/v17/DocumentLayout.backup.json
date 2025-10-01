@@ -5,10 +5,6 @@
     {
       "AbsoluteMoniker": "D:0:0:{5BBB7541-CE3C-4502-BCBA-F665AFF3470F}|VaR FX\\VaR FX.pyproj|C:\\Users\\Giorg\\source\\repos\\VaR FX\\VaR FX\\VaR_FX.py||{8B382828-6202-11D1-8870-0000F87579D2}",
       "RelativeMoniker": "D:0:0:{5BBB7541-CE3C-4502-BCBA-F665AFF3470F}|VaR FX\\VaR FX.pyproj|solutionrelative:VaR FX\\VaR_FX.py||{8B382828-6202-11D1-8870-0000F87579D2}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\Giorg\\source\\repos\\VaR FX\\VaR FX\\test_yfinance.py||{8B382828-6202-11D1-8870-0000F87579D2}",
-      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:VaR FX\\test_yfinance.py||{8B382828-6202-11D1-8870-0000F87579D2}"
     }
   ],
   "DocumentGroupContainers": [
@@ -18,21 +14,8 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 1,
+          "SelectedChildIndex": 0,
           "Children": [
-            {
-              "$type": "Document",
-              "DocumentIndex": 1,
-              "Title": "test_yfinance.py",
-              "DocumentMoniker": "C:\\Users\\Giorg\\source\\repos\\VaR FX\\VaR FX\\test_yfinance.py",
-              "RelativeDocumentMoniker": "VaR FX\\test_yfinance.py",
-              "ToolTip": "C:\\Users\\Giorg\\source\\repos\\VaR FX\\VaR FX\\test_yfinance.py",
-              "RelativeToolTip": "VaR FX\\test_yfinance.py",
-              "ViewState": "AgIAAIsCAAAAAAAAAAAiwJICAAAkAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001001|",
-              "WhenOpened": "2025-09-30T19:30:59.856Z",
-              "EditorCaption": ""
-            },
             {
               "$type": "Document",
               "DocumentIndex": 0,
@@ -41,7 +24,7 @@
               "RelativeDocumentMoniker": "VaR FX\\VaR_FX.py",
               "ToolTip": "C:\\Users\\Giorg\\source\\repos\\VaR FX\\VaR FX\\VaR_FX.py",
               "RelativeToolTip": "VaR FX\\VaR_FX.py",
-              "ViewState": "AgIAALcAAAAAAAAAAAAqwNEAAAAEAAAAAAAAAA==",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001001|",
               "WhenOpened": "2025-09-30T19:26:06.967Z",
               "EditorCaption": ""

@@ -33,9 +33,9 @@ class FXPortfolioAnalyzer:
 
         # FX pairs for fetching historical data from Yahoo Finance (vs. EUR)
         self.fx_pairs = {
-            'AUD': 'AUDEUR=X', 'DKK': 'EURDKK=X', 'GBP': 'GBPEUR=X', 'NOK': 'EURNOK=X',
-            'PLN': 'EURPLN=X', 'USD': 'USDEUR=X', 'CHF': 'CHFEUR=X', 'CZK': 'EURCZK=X',
-            'HKD': 'EURHKD=X', 'HUF': 'EURHUF=X', 'SEK': 'EURSEK=X', 'ZAR': 'EURZAR=X'
+            'AUD': 'AUDEUR=X', 'DKK': 'DKKEUR=X', 'GBP': 'GBPEUR=X', 'NOK': 'NOKEUR=X',
+            'PLN': 'PLNEUR=X', 'USD': 'USDEUR=X', 'CHF': 'CHFEUR=X', 'CZK': 'ZAKEUR=X',
+            'HKD': 'HKDEUR=X', 'HUF': 'HUFEUR=X', 'SEK': 'SEKEUR=X', 'ZAR': 'ZAREUR=X'
         }
 
         # Initialize with a default correlation matrix and empty historical data
@@ -43,11 +43,57 @@ class FXPortfolioAnalyzer:
         self.historical_correlations = None
         self.historical_data = None
 
+    
+    # Place this updated function inside your FXPortfolioAnalyzer class
+
     def _make_matrix_positive_definite(self, matrix):
-        min_eig = np.min(np.real(np.linalg.eigvals(matrix)))
-        if min_eig < 1e-8:
-            matrix += np.eye(matrix.shape[0]) * (1e-8 - min_eig)
+        """
+        Adjusts a correlation matrix to ensure it is positive semi-definite
+        using the eigenvalue clipping method, while ensuring the diagonal remains 1.
+        """       
+        eigenvalues, eigenvectors = np.linalg.eigh(matrix)
+        
+        #Clip any eigenvalues that are too small (or negative)
+        min_eigenvalue = 1e-8 # A small positive constant
+        eigenvalues[eigenvalues < min_eigenvalue] = min_eigenvalue
+               
+        #matrix is now positive semi-definite
+        reconstructed_matrix = eigenvectors @ np.diag(eigenvalues) @ eigenvectors.T
+        
+        # Re-normalize the matrix to ensure the diagonal is 1
+        inv_diag = np.diag(1.0 / np.sqrt(np.diag(reconstructed_matrix)))
+        matrix = inv_diag @ reconstructed_matrix @ inv_diag
+        
+        matrix = (matrix + matrix.T) / 2
+        np.fill_diagonal(matrix, 1.0) # Enforce 1s on the diagonal
+        
         return matrix
+
+
+    def calculate_carry_and_hedging(self, exposures, time_horizon=0.5):
+        carry_rates = {
+                'AUD': -0.0162, 'DKK': 0.0035, 'GBP': -0.0203, 'NOK': -0.0199, 'PLN': -0.0268,
+                'USD': -0.0196, 'CHF': 0.0211, 'CZK': -0.0123, 'HKD': -0.0129, 'HUF': -0.0430,
+                'SEK': 0.0009, 'ZAR': -0.0477
+        }
+        results = {}
+        for c, exp in exposures.items():
+            if c == 'EUR' or exp == 0:
+                continue
+            rate = carry_rates.get(c, 0)
+            # Hedging benefit/cost
+            hedge = -exp * rate * time_horizon
+            # Split into earning vs paying
+            earning = hedge if hedge > 0 else 0
+            paying = hedge if hedge < 0 else 0
+            results[c] = {
+                    'Hedging (EUR)': hedge,
+                    'Earning Carry': earning,
+                    'Paying Carry': paying
+            }
+        return results
+
+
 
     def _generate_default_correlation_matrix(self):
         currencies = list(self.currency_volatilities.keys())
@@ -142,7 +188,8 @@ class FXPortfolioAnalyzer:
         component_var = {c: exposures_arr[i] * marginal_var_array[i] for i, c in enumerate(active_currencies)}
         contribution_pct = {c: (v / portfolio_var * 100) if portfolio_var > 1e-9 else 0 for c, v in component_var.items()}
         
-        return portfolio_var, component_var, contribution_pct
+        return portfolio_var, component_var, contribution_pct, dict(zip(active_currencies, marginal_var_array))
+
 
     def calculate_individual_var(self, exposures, confidence_level=0.95, time_horizon=0.5):
         individual_vars = {}
@@ -151,6 +198,84 @@ class FXPortfolioAnalyzer:
                 vol = self.currency_volatilities[currency]
                 individual_vars[currency] = abs(exposure) * vol * np.sqrt(time_horizon) * stats.norm.ppf(confidence_level)
         return individual_vars
+
+
+    def scale_marginal_var(self, marginal_var_dict, scale=1.0):
+        """
+        Scale the marginal VaR dictionary to a meaningful unit.
+        Example: scale=1_000_000 gives marginal VaR per €1,000,000 exposure.
+        """
+        return {c: v * scale for c, v in marginal_var_dict.items()}
+
+    def impact_of_exposure_change(self, marginal_var_dict, delta_exposures):
+        """
+        Estimate the delta VaR (EUR) from changing exposures by delta_exposures dict.
+        delta_exposures: dict {currency: delta_amount_in_eur}
+        Returns: dict with per-currency delta VaR and total delta VaR (sum).
+        """
+        per_currency = {}
+        total = 0.0
+        for c, delta in delta_exposures.items():
+            mv = marginal_var_dict.get(c, 0.0)
+            dv = mv * delta
+            per_currency[c] = dv
+            total += dv
+        return per_currency, total
+
+    def hedging_cost_for_change(self, delta_exposures, time_horizon=0.5, carry_rates=None):
+        """
+        Estimate hedging cost (EUR) to hedge `delta_exposures` using forwards.
+        Convention: if delta_exposures[c] is the amount hedged (positive = long position reduced),
+        cost = -delta * carry_rate * time_horizon (same sign convention used earlier).
+        Returns per-currency and total cost.
+        """
+        if carry_rates is None:
+            carry_rates = {
+                'AUD': -0.0162, 'DKK': 0.0035, 'GBP': -0.0203, 'NOK': -0.0199, 'PLN': -0.0268,
+                'USD': -0.0196, 'CHF': 0.0211, 'CZK': -0.0123, 'HKD': -0.0129, 'HUF': -0.0430,
+                'SEK': 0.0009, 'ZAR': -0.0477
+            }
+        per_currency = {}
+        total = 0.0
+        for c, delta in delta_exposures.items():
+            rate = carry_rates.get(c, 0.0)
+            cost = -delta * rate * time_horizon
+            per_currency[c] = cost
+            total += cost
+        return per_currency, total
+
+    def hedging_impact_for_ratio(self, exposures, hedge_ratio, time_horizon=0.5,
+                                 confidence_level=0.95, use_historical=False, scale=1.0):
+        """
+        Compute the VaR and cost impact of hedging a fraction `hedge_ratio` (0..1)
+        of each exposure. Returns:
+          - original_var
+          - new_var
+          - var_reduction = original_var - new_var
+          - hedging_cost (EUR) computed from carry rates
+          - per-currency breakdowns
+        """
+        # original
+        orig_var, _, _, _ = self.calculate_parametric_var(exposures, confidence_level, time_horizon, use_historical)
+        # build hedged exposures
+        hedged_exposures = {c: e * (1 - hedge_ratio) for c, e in exposures.items()}
+        new_var, _, _, _ = self.calculate_parametric_var(hedged_exposures, confidence_level, time_horizon, use_historical)
+        var_reduction = orig_var - new_var
+
+        # hedged amounts (the notional we are hedging)
+        delta_exposures = {c: exposures.get(c, 0) * hedge_ratio for c in exposures.keys()}
+        # cost to hedge those amounts
+        costs_per_c, total_cost = self.hedging_cost_for_change(delta_exposures, time_horizon)
+
+        return {
+            'original_var': orig_var,
+            'new_var': new_var,
+            'var_reduction': var_reduction,
+            'hedge_notional_per_currency': delta_exposures,
+            'hedging_costs_per_currency': costs_per_c,
+            'total_hedging_cost': total_cost
+        }
+
 
     def monte_carlo_simulation(self, exposures, num_simulations=10000, time_horizon=0.5, use_historical=False):
         active_currencies = [c for c, e in exposures.items() if e != 0 and c != 'EUR']
@@ -205,6 +330,10 @@ class FXPortfolioAnalyzer:
         
         return cost_points, var_points
 
+
+    
+
+
 def main():
     st.title("FX Portfolio Risk Analysis 📊")
     
@@ -235,7 +364,16 @@ def main():
 
     st.sidebar.subheader("Risk Parameters")
     confidence_level = st.sidebar.slider("Confidence Level", 0.90, 0.99, 0.95, 0.01, help="The probability level for the VaR calculation. 95% is standard.")
-    time_horizon = st.sidebar.slider("Time Horizon (Years)", 0.25, 2.0, 0.5, 0.25, help="The time frame for the risk assessment. The report uses 6 months (0.5 years).")
+    #time_horizon = st.sidebar.slider("Time Horizon (Years)", 0.25, 2.0, 0.5, 0.25, help="The time frame for the risk assessment. The report uses 6 months (0.5 years).")
+    time_horizon = st.sidebar.number_input(
+        "Time Horizon (Years)", 
+        min_value=0.1, 
+        max_value=5.0, 
+        value=0.5, 
+        step=0.05,
+        format="%.2f", 
+        help="The time frame for the risk assessment. Example: 6 months = 0.5"
+    )
     num_simulations = st.sidebar.select_slider("Monte Carlo Simulations", options=[1000, 5000, 10000, 20000, 50000], value=10000)
 
     st.sidebar.subheader("Correlation Settings")
@@ -255,7 +393,8 @@ def main():
         "📈 Portfolio Overview", "📊 Parametric VaR", "🎲 Monte Carlo", "🛡️ Efficient Frontier", "🔗 Correlations"
     ])
 
-    portfolio_var, _, _ = analyzer.calculate_parametric_var(exposures, confidence_level, time_horizon, use_historical)
+    #portfolio_var, _, _ = analyzer.calculate_parametric_var(exposures, confidence_level, time_horizon, use_historical)
+    portfolio_var, component_var, contribution_pct, marginal_var = analyzer.calculate_parametric_var(exposures, confidence_level, time_horizon, use_historical)
     individual_vars = analyzer.calculate_individual_var(exposures, confidence_level, time_horizon)
     sum_individual_var = sum(individual_vars.values())
     diversification_benefit = sum_individual_var - portfolio_var
@@ -271,30 +410,71 @@ def main():
         col1.metric("Total Long Exposure", f"€{total_long:,.0f}")
         col2.metric("Total Short Exposure", f"€{total_short:,.0f}")
         col3.metric("Net Exposure", f"€{net_exposure:,.0f}")
+
+        st.subheader("Exposure Details")
+                     
         exp_df = pd.DataFrame(exposures.items(), columns=['Currency', 'Exposure']).sort_values('Exposure', ascending=False)
-        fig_exp = px.bar(exp_df, x='Currency', y='Exposure', title='EUR Equivalent Exposure by Currency',
-                         color='Exposure', color_continuous_scale='RdBu_r',
-                         labels={'Exposure': 'Exposure (EUR)'})
+        fig_exp = px.bar(exp_df, x='Currency', y='Exposure', title='EUR Equivalent Exposure by Currency',color='Exposure', color_continuous_scale='RdBu_r',labels={'Exposure': 'Exposure (EUR)'})
+        
         st.plotly_chart(fig_exp, use_container_width=True)
+
 
     with tab2:
         st.header(f"Parametric VaR Analysis ({confidence_level:.0%})")
-        #st.markdown("This analysis uses the **variance-covariance method**, assuming returns follow a normal distribution, to calculate the portfolio's Value at Risk (VaR).")
         col1, col2, col3 = st.columns(3)
         col1.metric("Total Portfolio VaR", f"€{portfolio_var:,.0f}", help="The maximum expected loss for the entire portfolio after accounting for diversification.")
         col2.metric("Undiversified VaR", f"€{sum_individual_var:,.0f}", help="The sum of the VaRs of each currency position, calculated independently.")
         col3.metric("Diversification Benefit", f"€{diversification_benefit:,.0f}", f"{diversification_pct:.1f}%", help="The risk reduction achieved by holding a diversified portfolio.")
-        
-        _, _, contribution_pct = analyzer.calculate_parametric_var(exposures, confidence_level, time_horizon, use_historical)
+    
         if contribution_pct:
             contrib_df = pd.DataFrame(contribution_pct.items(), columns=['Currency', 'Contribution']).sort_values('Contribution', ascending=False)
             fig_contrib = px.bar(contrib_df, x='Currency', y='Contribution', title='Contribution to Portfolio Risk (%)',
                                  color='Contribution', color_continuous_scale='viridis',
                                  labels={'Contribution': 'Contribution to Risk (%)'})
             st.plotly_chart(fig_contrib, use_container_width=True)
-            st.markdown("**Component VaR** measures each position's contribution to the total portfolio VaR in currency terms.")
+
+            st.subheader("Risk Contribution Details")
+
+            # Scale marginal VaR to per €1m exposure
+            marginal_var_scaled = analyzer.scale_marginal_var(marginal_var, scale=1_000_000)
+
+            # Combine all risk metrics into a single DataFrame
+            risk_df = pd.DataFrame({
+                    'Individual VaR': pd.Series(individual_vars),
+                    'Component VaR': pd.Series(component_var),
+                    'Contribution (%)': pd.Series(contribution_pct),
+                    'Marginal VaR (EUR)': pd.Series(marginal_var),
+                    'Marginal VaR per €1m': pd.Series(marginal_var_scaled),
+                    'Individual Volatility': pd.Series({
+                        c: analyzer.currency_volatilities.get(c, 0) for c in exposures.keys()
+                    })
+                }).reset_index().rename(columns={'index': 'Currency'}).fillna(0)
+
+            risk_df = risk_df.sort_values('Contribution (%)', ascending=False)
+
+            carry_data = analyzer.calculate_carry_and_hedging(exposures, time_horizon)
+            carry_df = pd.DataFrame(carry_data).T.reset_index().rename(columns={'index': 'Currency'})
+            risk_df = risk_df.merge(carry_df, on="Currency", how="left").fillna(0)
+
+            st.dataframe(
+                risk_df.style.format({
+                    'Individual VaR': '€{:,.0f}',
+                    'Component VaR': '€{:,.0f}',
+                    'Contribution (%)': '{:.2f}%',
+                    'Marginal VaR (EUR)': '€{:,.6f}',
+                    'Marginal VaR per €1m': '€{:,.2f}',
+                    'Individual Volatility': '{:.2%}',
+                    'Hedging (EUR)': '€{:,.0f}',
+                    'Earning Carry': '€{:,.0f}',
+                    'Paying Carry': '€{:,.0f}'
+                }),
+                use_container_width=True,
+                hide_index=True
+            )
+
         else:
             st.info("No active exposures to analyze for risk contribution.")
+
 
     with tab3:
         st.header("Monte Carlo Simulation")
