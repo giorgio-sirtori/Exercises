@@ -428,6 +428,7 @@ def main():
 
     with tab1:
         st.header("Portfolio Overview")
+        st.markdown("A summary of the current currency exposures. The report's functional currency is EUR.")
         col1, col2, col3 = st.columns(3)
         total_long = sum(v for v in exposures.values() if v > 0)
         total_short = sum(abs(v) for v in exposures.values() if v < 0)
@@ -505,6 +506,7 @@ def main():
 
     with tab3:
         st.header("Monte Carlo Simulation")
+        st.markdown(f"This simulation models potential portfolio outcomes by generating thousands of random market scenarios ({num_simulations:,} runs).")
         with st.spinner("Running Monte Carlo simulation..."):
             portfolio_returns = analyzer.monte_carlo_simulation(exposures, num_simulations, time_horizon, use_historical)
         simulated_var = -np.percentile(portfolio_returns, (1 - confidence_level) * 100)
@@ -521,6 +523,7 @@ def main():
 
     with tab4:
        st.header("Efficient Frontier for Hedging")
+       st.markdown("The **Efficient Frontier** illustrates the optimal trade-off between reducing portfolio risk (VaR) and the cost or benefit of hedging using FX forwards.")
        cost_points, var_points = analyzer.calculate_efficient_frontier(exposures, time_horizon, use_historical=use_historical)
        
        fig_ef = go.Figure()
