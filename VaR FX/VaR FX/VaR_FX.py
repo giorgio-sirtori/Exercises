@@ -14,7 +14,6 @@ warnings.filterwarnings('ignore')
 # Set page configuration for a better user experience
 st.set_page_config(
     page_title="FX Portfolio Risk Analysis",
-    page_icon="📊",
     layout="wide"
 )
 
@@ -335,7 +334,7 @@ class FXPortfolioAnalyzer:
 
 
 def main():
-    st.title("FX Portfolio Risk Analysis 📊")
+    st.title("FX Portfolio Risk Analysis")
     
     if 'analyzer' not in st.session_state:
         st.session_state.analyzer = FXPortfolioAnalyzer()
@@ -390,7 +389,7 @@ def main():
             analyzer.calculate_historical_correlations(correlation_period)
 
     tab1, tab2, tab3, tab4, tab5 = st.tabs([
-        "📈 Portfolio Overview", "📊 Parametric VaR", "🎲 Monte Carlo", "🛡️ Efficient Frontier", "🔗 Correlations"
+        "Portfolio Overview", "Parametric VaR", "Monte Carlo", "Efficient Frontier", "Correlations"
     ])
 
     #portfolio_var, _, _ = analyzer.calculate_parametric_var(exposures, confidence_level, time_horizon, use_historical)
@@ -440,6 +439,7 @@ def main():
 
             # Combine all risk metrics into a single DataFrame
             risk_df = pd.DataFrame({
+                    'Exposure': pd.Series(exposures),
                     'Individual VaR': pd.Series(individual_vars),
                     'Component VaR': pd.Series(component_var),
                     'Contribution (%)': pd.Series(contribution_pct),
@@ -451,6 +451,9 @@ def main():
                 }).reset_index().rename(columns={'index': 'Currency'}).fillna(0)
 
             risk_df = risk_df.sort_values('Contribution (%)', ascending=False)
+            
+            risk_df['Exposure_x_MarginalVaR'] = risk_df['Exposure'] * risk_df['Marginal VaR (EUR)'] *-1
+
 
             carry_data = analyzer.calculate_carry_and_hedging(exposures, time_horizon)
             carry_df = pd.DataFrame(carry_data).T.reset_index().rename(columns={'index': 'Currency'})
@@ -458,12 +461,14 @@ def main():
 
             st.dataframe(
                 risk_df.style.format({
+                    'Exposure': '€{:,.0f}',
                     'Individual VaR': '€{:,.0f}',
                     'Component VaR': '€{:,.0f}',
                     'Contribution (%)': '{:.2f}%',
                     'Marginal VaR (EUR)': '€{:,.6f}',
                     'Marginal VaR per €1m': '€{:,.2f}',
                     'Individual Volatility': '{:.2%}',
+                    'Exposure_x_MarginalVaR': '€{:,.0f}',
                     'Hedging (EUR)': '€{:,.0f}',
                     'Earning Carry': '€{:,.0f}',
                     'Paying Carry': '€{:,.0f}'
