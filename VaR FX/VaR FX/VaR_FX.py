@@ -8,10 +8,10 @@ from datetime import datetime
 import warnings
 import yfinance as yf
 
-# Ignore warnings for cleaner output
+
 warnings.filterwarnings('ignore')
 
-# Set page configuration for a better user experience
+
 st.set_page_config(
     page_title="FX Portfolio Risk Analysis",
     layout="wide"
@@ -40,7 +40,6 @@ class FXPortfolioAnalyzer:
         self.correlation_matrix = self._create_initial_correlation_matrix()
         self.historical_correlations = None
         self.historical_data = None
-        # --- NEW: Added instance variable to store calculated volatilities ---
         self.historical_volatilities = None
 
 
@@ -95,7 +94,6 @@ class FXPortfolioAnalyzer:
         corr_matrix = self._make_matrix_positive_definite(corr_matrix)
         return pd.DataFrame(corr_matrix, index=currencies, columns=currencies)
 
-    # --- NEW: Method to calculate and store volatilities from historical data ---
     def _calculate_and_store_volatilities(self, historical_returns):
         """
         Calculates annualized volatility from daily returns and stores it.
@@ -155,7 +153,6 @@ class FXPortfolioAnalyzer:
         with st.spinner("Fetching initial 6-month correlation & volatility data..."):
             historical_returns = self._fetch_historical_data_silent(period="6mo")
             
-            # --- MODIFIED: Calculate volatilities on initial fetch ---
             self._calculate_and_store_volatilities(historical_returns)
             
             if not historical_returns:
@@ -177,7 +174,6 @@ class FXPortfolioAnalyzer:
     def calculate_historical_correlations(self, period="6mo"):
         self.fetch_historical_data(period)
         
-        # --- MODIFIED: Calculate volatilities whenever correlations are calculated ---
         self._calculate_and_store_volatilities(self.historical_data)
 
         if not self.historical_data:
@@ -201,7 +197,6 @@ class FXPortfolioAnalyzer:
         )
         return self.historical_correlations
 
-    # --- MODIFIED: Parametric VaR now uses dynamic volatilities ---
     def calculate_parametric_var(self, exposures, confidence_level=0.95, time_horizon=0.5, use_historical=False):
         active_currencies = [c for c, e in exposures.items() if e != 0 and c != 'EUR']
         if not active_currencies:
@@ -242,7 +237,6 @@ class FXPortfolioAnalyzer:
         
         return portfolio_var, component_var, contribution_pct, dict(zip(active_currencies, marginal_var_array))
 
-    # --- MODIFIED: Individual VaR now uses dynamic volatilities ---
     def calculate_individual_var(self, exposures, confidence_level=0.95, time_horizon=0.5, use_historical=False):
         individual_vars = {}
         
@@ -306,7 +300,6 @@ class FXPortfolioAnalyzer:
             'total_hedging_cost': total_cost
         }
 
-    # --- MODIFIED: Monte Carlo now uses dynamic volatilities ---
     def monte_carlo_simulation(self, exposures, num_simulations=10000, time_horizon=0.5, use_historical=False):
         active_currencies = [c for c, e in exposures.items() if e != 0 and c != 'EUR']
         if not active_currencies:
@@ -419,7 +412,7 @@ def main():
         "Portfolio Overview", "Parametric VaR", "Monte Carlo", "Efficient Frontier", "Correlations"
     ])
     
-    # --- All VaR calculations now pass use_historical to select the right data ---
+    # --- All VaR calculations now pass use_historical
     portfolio_var, component_var, contribution_pct, marginal_var = analyzer.calculate_parametric_var(exposures, confidence_level, time_horizon, use_historical)
     individual_vars = analyzer.calculate_individual_var(exposures, confidence_level, time_horizon, use_historical)
     sum_individual_var = sum(individual_vars.values())
@@ -458,7 +451,6 @@ def main():
             st.subheader("Risk Contribution Details")
             marginal_var_scaled = analyzer.scale_marginal_var(marginal_var, scale=1_000_000)
 
-            # --- MODIFIED: Ensure the displayed volatility is the one used in calculation ---
             if use_historical and analyzer.historical_volatilities:
                 vols_to_display = analyzer.historical_volatilities
             else:
