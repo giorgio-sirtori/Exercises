@@ -23,7 +23,7 @@ class FXPortfolioAnalyzer:
     including VaR calculations, Monte Carlo simulations, and efficient frontier analysis.
     """
     def __init__(self):
-        # Hardcoded values now serve as a FALLBACK if data fetching fails
+        # hardcoded fallback
         self.currency_volatilities = {
             'AUD': 0.067, 'DKK': 0.011, 'GBP': 0.054, 'NOK': 0.075, 'PLN': 0.048,
             'USD': 0.068, 'CHF': 0.048, 'CZK': 0.035, 'HKD': 0.069, 'HUF': 0.069,

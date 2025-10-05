@@ -8,6 +8,7 @@ st.set_page_config(
     layout="wide"
 )
 
+# --- Data Constants ---
 INTEREST_RATES = {
     'EUR': 0.0425, # ECB Deposit Facility Rate
     'AUD': 0.0435, # Reserve Bank of Australia Cash Rate
@@ -24,14 +25,14 @@ INTEREST_RATES = {
     'ZAR': 0.0825  # South African Reserve Bank Repo Rate
 }
 
-
 FX_PAIRS_TO_FETCH = {
     'AUD': 'EURAUD=X', 'DKK': 'EURDKK=X', 'GBP': 'EURGBP=X', 'NOK': 'EURNOK=X',
     'PLN': 'EURPLN=X', 'USD': 'EURUSD=X', 'CHF': 'EURCHF=X', 'CZK': 'EURCZK=X',
     'HKD': 'EURHKD=X', 'HUF': 'EURHUF=X', 'SEK': 'EURSEK=X', 'ZAR': 'EURZAR=X'
 }
 
-@st.cache_data(ttl=600) 
+# --- Data Fetching ---
+@st.cache_data(ttl=600)
 def fetch_spot_rates():
     """Fetches the latest spot rates from Yahoo Finance."""
     tickers = list(FX_PAIRS_TO_FETCH.values())
@@ -39,24 +40,28 @@ def fetch_spot_rates():
     if data.empty:
         st.error("Could not fetch live FX data. Please check your connection or try again later.")
         return None
-        
+
     latest_prices = data['Close'].iloc[-1]
-    
+
     spot_rates = {}
     for base_curr, ticker in FX_PAIRS_TO_FETCH.items():
         if ticker in latest_prices and latest_prices[ticker] > 0:
             spot_rates[base_curr] = 1 / latest_prices[ticker]
         else:
-            spot_rates[base_curr] = 0 
-            
+            # FIX: Changed 0 to 0.0 to ensure the function always returns floats.
+            # This prevents the StreamlitMixedNumericTypesError in st.number_input.
+            spot_rates[base_curr] = 0.0
+
     return spot_rates
 
+# --- Core Logic ---
 def calculate_cost_of_carry(spot_rate, domestic_rate, foreign_rate, days, day_count):
     """Calculates the Cost of Carry for a currency pair."""
     if day_count == 0 or spot_rate == 0:
-        return 0
+        return 0.0
     return spot_rate * (domestic_rate - foreign_rate) * (days / day_count)
 
+# --- Main App ---
 if 'spot_rates' not in st.session_state:
     st.session_state.spot_rates = fetch_spot_rates()
 
@@ -64,48 +69,54 @@ st.title("Live Currency Cost of Carry Calculator")
 st.markdown(f"This tool fetches **live exchange rates** to calculate the net cost or gain of holding a currency position. Interest rates are recent central bank policy rates.")
 st.caption(f"Data last refreshed: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
+# --- Sidebar for Inputs ---
 with st.sidebar:
     st.header("Parameters")
-    
+
     if st.button("Refresh Live Spot Rates"):
         st.session_state.spot_rates = fetch_spot_rates()
+        st.rerun()
 
     base_currency_list = list(FX_PAIRS_TO_FETCH.keys())
     selected_base_curr = st.selectbox(
         "Select Base Currency (to go long/buy)",
         options=base_currency_list,
-        index=base_currency_list.index('USD') 
+        index=base_currency_list.index('USD')
     )
-    
+
     quote_currency = "EUR"
-    
+
     st.write(f"**Selected Pair:** `{selected_base_curr}/{quote_currency}`")
     st.info(f"A 'long' position means you are buying **{selected_base_curr}** and selling **{quote_currency}**.")
 
     live_spot_rate = st.session_state.spot_rates.get(selected_base_curr, 0.0) if st.session_state.spot_rates else 0.0
-    
+
     st.subheader("Adjust Values")
-    
+
     spot_rate = st.number_input(
         f"Spot Rate ({selected_base_curr} per {quote_currency})",
-        min_value=0.0, value=live_spot_rate, step=0.0001, format="%.4f",
+        min_value=0.0,
+        value=live_spot_rate,
+        step=0.0001,
+        format="%.4f",
         help="This value is fetched live. You can override it here."
     )
-    
+
     foreign_rate = st.number_input(
         f"Interest Rate for **{selected_base_curr}** (Base Currency)",
         min_value=-0.05, max_value=1.0, value=INTEREST_RATES.get(selected_base_curr, 0.0), step=0.0001, format="%.4f"
     )
-    
+
     domestic_rate = st.number_input(
         f"Interest Rate for **{quote_currency}** (Quote Currency)",
         min_value=-0.05, max_value=1.0, value=INTEREST_RATES.get(quote_currency, 0.0), step=0.0001, format="%.4f"
     )
-    
+
     days = st.slider("Holding Period (Days)", min_value=1, max_value=365, value=90)
     day_count = st.selectbox("Day Count Convention", options=[360, 365], index=0)
 
 
+# --- Results Display ---
 st.markdown("---")
 st.header("Results")
 
@@ -121,8 +132,7 @@ with col1:
 with col2:
     st.subheader("Cost of Carry Analysis")
     carry_cost = calculate_cost_of_carry(spot_rate, domestic_rate, foreign_rate, days, day_count)
-    
-   
+
     if carry_cost >= 0:
         st.metric(
             label=f"Net COST for {days} days",
