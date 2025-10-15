@@ -393,7 +393,7 @@ def main():
         format="%.2f", 
         help="The time frame for the risk assessment. Example: 6 months = 0.5"
     )
-    num_simulations = st.sidebar.select_slider("Monte Carlo Simulations", options=[1000, 5000, 10000, 20000, 50000], value=10000)
+    num_simulations = st.sidebar.select_slider("Monte Carlo Simulations", options=[1000, 5000, 10000, 20000, 50000, 100000, 150000], value=10000)
 
     st.sidebar.subheader("Correlation Settings")
     correlation_period = st.sidebar.selectbox("Historical Period", ["3mo", "6mo", "1y", "2y", "5y"], index=1, help="The look-back period for calculating historical correlations and volatilities.")
