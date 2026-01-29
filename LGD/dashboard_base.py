@@ -9,7 +9,7 @@ from statsmodels.stats.outliers_influence import variance_inflation_factor
 from sklearn.preprocessing import LabelEncoder, OneHotEncoder
 
 def load_data():
-    csv_file = "unpaid_data_20250722.csv"
+    csv_file = "deposit.csv"
     if os.path.exists(csv_file):
         return pd.read_csv(csv_file)
     else:
